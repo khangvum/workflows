@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: "high"
+      working-directory:
+        description: 'Directory where package.json is located'
+        required: false
+        type: string
+        default: '.'
 
 jobs:
   audit:
@@ -29,6 +34,8 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: "npm"
+          cache-dependency-path: ${{ inputs.working-directory != '.' && format('{0}/package-lock.json', inputs.working-directory) || 'package-lock.json' }}
 
       - name: Dependency Audit Execution
+        working-directory: ${{ inputs.working-directory }}
         run: npm audit --audit-level=${{ inputs.audit-level }}
