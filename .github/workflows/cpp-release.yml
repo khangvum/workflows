@@ -7,6 +7,10 @@ on:
         description: "The name of the application and solution file"
         required: true
         type: string
+      boost_version:
+        description: "The Boost version to install (e.g. 1.92.0)"
+        required: false
+        type: string
 
 jobs:
   build-release:
@@ -20,6 +24,67 @@ jobs:
 
       - name: Set up MSBuild
         uses: microsoft/setup-msbuild@v3
+
+      - name: Compute Boost Paths
+        id: boost_vars
+        if: inputs.boost_version != ''
+        shell: pwsh
+        run: |
+          $boostVersion = "${{ inputs.boost_version }}"
+          $boostVersionUnderscore = $boostVersion -replace '\.', '_'
+          "boost_version_underscore=$boostVersionUnderscore" >> $env:GITHUB_OUTPUT
+          "boost_root=C:\local\boost_$boostVersionUnderscore" >> $env:GITHUB_OUTPUT
+
+      - name: Cache Boost
+        id: cache-boost
+        if: inputs.boost_version != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.boost_vars.outputs.boost_root }}
+          key: boost-${{ inputs.boost_version }}-msvc-14.5-64-${{ runner.os }}
+
+      - name: Install Boost
+        if: inputs.boost_version != '' && steps.cache-boost.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $boostVersion = "${{ inputs.boost_version }}"
+          $boostVersionUnderscore = "${{ steps.boost_vars.outputs.boost_version_underscore }}"
+          Write-Host "Setting up Boost $boostVersion binary locally..."
+
+          $url = "https://archives.boost.io/release/$boostVersion/binaries/boost_${boostVersionUnderscore}-msvc-14.5-64.exe"
+          $installerPath = "$env:TEMP\boost_installer.exe"
+
+          $wc = New-Object System.Net.WebClient
+          $wc.DownloadFile($url, $installerPath)
+
+          Write-Host "Installing silently..."
+          Start-Process -Wait -FilePath $installerPath -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/SP-"
+          Remove-Item $installerPath -Force
+
+          if (-not (Test-Path "C:\local\boost_$boostVersionUnderscore\boost\version.hpp")) {
+            Write-Error "Boost installation did not complete as expected."
+            exit 1
+          }
+          Write-Host "Boost setup completed!"
+
+      - name: Verify Cached Boost
+        if: inputs.boost_version != '' && steps.cache-boost.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          $boostVersionUnderscore = "${{ steps.boost_vars.outputs.boost_version_underscore }}"
+          if (-not (Test-Path "C:\local\boost_$boostVersionUnderscore\boost\version.hpp")) {
+            Write-Error "Cache hit reported, but the expected Boost files are missing."
+            exit 1
+          }
+          Write-Host "Using cached Boost $boostVersionUnderscore"
+
+      - name: Export Boost Environment Variables
+        if: inputs.boost_version != ''
+        shell: pwsh
+        run: |
+          $boostVersionUnderscore = "${{ steps.boost_vars.outputs.boost_version_underscore }}"
+          "BOOST_ROOT=C:\local\boost_$boostVersionUnderscore" >> $env:GITHUB_ENV
+          "BOOST_LIBRARYDIR=C:\local\boost_${boostVersionUnderscore}\lib64-msvc-14.5" >> $env:GITHUB_ENV
 
       - name: Build Release x64
         run: >
