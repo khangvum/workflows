@@ -1,0 +1,64 @@
+name: Reusable C++ Release Build
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: "The name of the application and solution file"
+        required: true
+        type: string
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Build Release x64
+        run: >
+          msbuild ${{ inputs.app_name }}.slnx
+          /p:Configuration=Release
+          /p:Platform=x64
+          /m
+
+      - name: Rename Executable
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          Copy-Item `
+            "x64/Release/${{ inputs.app_name }}.exe" `
+            "${{ inputs.app_name }}-${{ github.ref_name }}.exe"
+
+      - name: Upload Release Executable
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-executable
+          path: ${{ inputs.app_name }}-${{ github.ref_name }}.exe
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Release Executable
+        uses: actions/download-artifact@v8
+        with:
+          name: release-executable
+
+      - name: Create Release and Upload Executable
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: ${{ inputs.app_name }}-${{ github.ref_name }}.exe
