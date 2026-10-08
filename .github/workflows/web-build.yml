@@ -1,4 +1,4 @@
-name: Web Application Build
+name: Reusable Web Application Build
 
 on:
   workflow_call:
