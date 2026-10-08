@@ -1,0 +1,37 @@
+name: Web Application Build
+
+on:
+  workflow_call:
+    inputs:
+      cache-dependency-path:
+        description: "Path to lockfile for caching dependencies"
+        required: false
+        type: string
+        default: "package-lock.json"
+
+jobs:
+  build:
+    name: Lint & Build Web Application
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js environment
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint code quality checks
+        run: npm run lint
+
+      - name: Compile TypeScript and build production bundle
+        run: npm run build
