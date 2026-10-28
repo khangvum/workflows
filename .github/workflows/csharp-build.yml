@@ -5,7 +5,8 @@ on:
     inputs:
       project_path:
         description: "The path to the C# project or solution file (e.g., src/App.slnx)"
-        required: true
+        required: false
+        default: "."
         type: string
       dotnet_version:
         description: "The .NET SDK version to use (e.g., 10.0.x)"
