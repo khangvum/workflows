@@ -1,4 +1,4 @@
-name: Reusable C# Test Build
+name: Reusable C# Build
 
 on:
   workflow_call:
